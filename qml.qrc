@@ -1,0 +1,16 @@
+<RCC>
+    <qresource prefix="/">
+        <file>Qml/Main.qml</file>
+        <file>Qml/Theme.qml</file>
+        <file>Qml/MainBoard.qml</file>
+        <file>Qml/Elements/CTextBold.qml</file>
+        <file>Qml/Elements/PlayerHighlighter.qml</file>
+        <file>Qml/Elements/ScoreCardItem.qml</file>
+        <file>Qml/Elements/Coin.qml</file>
+        <file>Qml/Elements/HeaderItem.qml</file>
+        <file>Qml/Icon/crown.png</file>
+        <file>Qml/Icon/reset.png</file>
+        <file>Qml/Elements/CPopup.qml</file>
+        <file>Qml/Elements/CButton.qml</file>
+    </qresource>
+</RCC>
