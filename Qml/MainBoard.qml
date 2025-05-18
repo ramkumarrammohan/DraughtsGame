@@ -43,13 +43,7 @@ Rectangle {
 
                         MouseArea {
                             anchors.fill: parent
-                            onDoubleClicked: {
-                                board.makeKing(yCord, xCord)
-                            }
-
                             onClicked: {
-                                board.print(yCord, xCord)
-
                                 if(board.isMoving)
                                 {
                                     board.destination = Qt.point(yCord, xCord)
@@ -83,13 +77,11 @@ Rectangle {
         target: board
         function onGameDraw()
         {
-            console.log('game draw detected...')
             gameOverItemId.message = "Draw match\nPlay again..."
             gameOverItemId.open()
         }
         function onGameOver(player)
         {
-            console.log('game over detected...')
             var pname = (player === Enums.PlayerA) ? "Player A" : "Player B"
             gameOverItemId.message = qsTr("!! Congratulations !!\n%1 won the match.").arg(pname)
             gameOverItemId.open()

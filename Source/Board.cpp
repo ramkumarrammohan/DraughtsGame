@@ -3,14 +3,15 @@
 #include "Enums.h"
 
 #include <QDebug>
+#include <QQmlEngine>
 
 #define BOARD_SIZE 10
 
 Board::Board(QObject *parent)
     : QObject{parent}
 {
-    qDebug() << Q_FUNC_INFO;
     initialize();
+    registerQmlTypes();
 }
 
 Board::~Board()
@@ -28,7 +29,7 @@ void Board::move()
 
     QPoint diff = source() - destination();
     QPoint absDiff = QPoint(qAbs(diff.x()), qAbs(diff.y()));
-    qDebug() << "moving from:" << source() << "to:" << destination()
+    qDebug() << "\nmoving from:" << source() << "to:" << destination()
              << " ==> absDiff:" << absDiff;
 
     bool moveOk = false;
@@ -67,13 +68,15 @@ void Board::move()
              << "destination:" << this->destination();
 
     Enums::Player winner = checkForWinner();
-    if(winner != Enums::PlayerNone) {
-        qDebug() << "Gameover. winner announcement... winner:" << winner;
+    if(winner != Enums::PlayerNone)
+    {
+        qDebug() << "Gameover. winner:" << winner;
         emit gameOver(winner);
         return;
     }
 
-    if(isDraw()) {
+    if(isDraw())
+    {
         qDebug() << "Game draw.. No movements further";
         emit gameDraw();
         return;
@@ -135,26 +138,9 @@ void Board::setActiveItem(const int &row, const int &column)
     emit dataChanged();
 }
 
-void Board::print(const int &row, const int &column)
-{
-    Piece *p = m_board[row][column];
-    qDebug() << row << column << p->player() << p->type()
-             << QString("active:(%1)").arg(p->active());
-}
-
-void Board::makeKing(const int &row, const int &column)
-{
-    Piece *p = m_board[row][column];
-    if(p)
-    {
-        p->settype(Enums::King);
-    }
-
-    emit dataChanged();
-}
-
 void Board::initialize()
 {
+    // populates all the pieces
     m_board.resize(BOARD_SIZE);
     for(int i = 0; i < BOARD_SIZE; i++)
     {
@@ -222,7 +208,8 @@ bool Board::singleMoveValidation()
         return false;
 
     // man piece movement conditions
-    if (sourceP->type() == Enums::PieceType::Man) {
+    if (sourceP->type() == Enums::PieceType::Man)
+    {
         if (sourceP->player() == Enums::Player::PlayerA && diff.x() != 1)
             return false;  // PlayerA moves downward
         if (sourceP->player() == Enums::Player::PlayerB && diff.x() != -1)
@@ -232,6 +219,8 @@ bool Board::singleMoveValidation()
     // swap the pieces
     m_board[dst.x()][dst.y()] = sourceP;
     m_board[src.x()][src.y()] = destnP;
+
+    // extra validations
     setisMoving(false);
     checkAndPromoteKing(dst);
 
@@ -250,23 +239,24 @@ bool Board::multipleMoveValidation()
     if (!sourceP || !destnP)
         return false;
 
-    // Destination must be empty
+    // destination empty check
     if (destnP->player() != Enums::PlayerNone || destnP->type() != Enums::TypeNone)
         return false;
 
-    // Must be a 2-step diagonal
+    // allow only 2 step diagonal
     if (std::abs(diff.x()) != 2 || std::abs(diff.y()) != 2)
         return false;
 
-    // Restrict direction for Man pieces
-    if (sourceP->type() == Enums::PieceType::Man) {
+    // man piece movement conditions
+    if (sourceP->type() == Enums::PieceType::Man)
+    {
         if (sourceP->player() == Enums::Player::PlayerA && diff.x() != 2)
             return false;  // PlayerA moves downward (increasing x)
         if (sourceP->player() == Enums::Player::PlayerB && diff.x() != -2)
             return false;  // PlayerB moves upward (decreasing x)
     }
 
-    // Midpoint must contain opponent's piece
+    // midpoint must contain opponent's piece
     int midX = src.x() + diff.x() / 2;
     int midY = src.y() + diff.y() / 2;
 
@@ -274,22 +264,26 @@ bool Board::multipleMoveValidation()
     if (!middlePiece || middlePiece->player() != opponentPlayer())
         return false;
 
-    // Perform the capture
+    // perform the capture
     delete m_board[midX][midY];
     m_board[midX][midY] = new Piece();
     incrementScore();
 
+    // swap the pieces
     m_board[dst.x()][dst.y()] = sourceP;
     m_board[src.x()][src.y()] = destnP;
     checkAndPromoteKing(dst);
 
-    // Check for further capture
-    if (hasFurtherCaptures(dst)) {
+    // check for continuation
+    if (hasFurtherCaptures(dst))
+    {
         setsource(dst);
-        setisMoving(true);  // Continue chaining
-    } else {
+        setisMoving(true);  // turn continue
+    }
+    else
+    {
         sourceP->setactive(false);
-        setisMoving(false);  // Turn ends
+        setisMoving(false);  // turn ends
     }
 
     return true;
@@ -301,29 +295,37 @@ bool Board::hasFurtherCaptures(const QPoint &pos)
     if (!p || p->player() == Enums::PlayerNone)
         return false;
 
+    // allowed directions
     QVector<QPoint> directions;
-    if (p->type() == Enums::PieceType::King) {
+    if (p->type() == Enums::PieceType::King)
+    {
         directions = {QPoint(-2, -2), QPoint(-2, 2), QPoint(2, -2), QPoint(2, 2)};
-    } else {
+    }
+    else
+    {
         if (p->player() == Enums::Player::PlayerA)
             directions = {QPoint(2, -2), QPoint(2, 2)};
         else if (p->player() == Enums::Player::PlayerB)
             directions = {QPoint(-2, -2), QPoint(-2, 2)};
     }
 
-    foreach(const QPoint &d, directions) {
+    // check for capture existance in all directions
+    foreach(const QPoint &d, directions)
+    {
         int newX = pos.x() + d.x();
         int newY = pos.y() + d.y();
         int midX = pos.x() + d.x() / 2;
         int midY = pos.y() + d.y() / 2;
 
-        if (newX >= 0 && newX < BOARD_SIZE && newY >= 0 && newY < BOARD_SIZE) {
+        // non boundary check
+        if (newX >= 0 && newX < BOARD_SIZE && newY >= 0 && newY < BOARD_SIZE)
+        {
             Piece* landing = m_board[newX][newY];
             Piece* mid = m_board[midX][midY];
 
-            if (landing && mid &&
-                landing->player() == Enums::PlayerNone &&
-                mid->player() == opponentPlayer()) {
+            if (landing && mid && landing->player() == Enums::PlayerNone &&
+                mid->player() == opponentPlayer())
+            {
                 return true;
             }
         }
@@ -342,7 +344,6 @@ void Board::checkAndPromoteKing(const QPoint &pos)
         (p->player() == Enums::PlayerB && pos.x() == 0))
     {
         p->settype(Enums::PieceType::King);
-        qDebug() << "Piece promoted to King at" << pos;
     }
 }
 
@@ -359,9 +360,8 @@ Enums::Player Board::checkForWinner()
             if (!p || p->player() == Enums::PlayerNone)
                 continue;
 
-            QPoint pos(row, col);
-
             // Check if piece can move
+            QPoint pos(row, col);
             if (canPieceMove(pos))
             {
                 if (p->player() == Enums::PlayerA)
@@ -387,15 +387,23 @@ bool Board::canPieceMove(const QPoint &pos)
         return false;
 
     QVector<QPoint> directions;
-    if (p->type() == Enums::PieceType::King) {
+    if (p->type() == Enums::PieceType::King)
+    {
+        // all diagonal directions
         directions = { {-1,-1}, {-1,1}, {1,-1}, {1,1} };
-    } else if (p->player() == Enums::PlayerA) {
-        directions = { {1,-1}, {1,1} };  // downward
-    } else if (p->player() == Enums::PlayerB) {
-        directions = { {-1,-1}, {-1,1} };  // upward
+    }
+    else if (p->player() == Enums::PlayerA)
+    {
+        // downward only
+        directions = { {1,-1}, {1,1} };
+    }
+    else if (p->player() == Enums::PlayerB)
+    {
+        // upward only
+        directions = { {-1,-1}, {-1,1} };
     }
 
-    for (const QPoint &d : directions)
+    foreach(const QPoint &d, directions)
     {
         QPoint move = pos + d;
         if (isInBounds(move))
@@ -465,4 +473,13 @@ void Board::incrementScore()
         setplayerAScore(playerAScore() + 1);
     else if(activePlayer() == Enums::PlayerB)
         setplayerBScore(playerBScore() + 1);
+}
+
+void Board::registerQmlTypes()
+{
+    qmlRegisterType<Piece>("com.checkerboard", 1, 0,"Piece");
+    qmlRegisterSingletonType(QUrl("qrc:/Qml/Theme.qml"),
+                             "com.checkerboard.Theme", 1, 0, "Theme");
+    qmlRegisterUncreatableType<Enums>("com.checkerboard.Enums", 1, 0, "Enums",
+                                      "Enums are read only");
 }

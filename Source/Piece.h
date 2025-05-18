@@ -21,9 +21,7 @@ public:
                    QObject *parent = nullptr);
     ~Piece() override;
 
-    void updateFromVariantMap(const QVariantMap &map);
     QVariantMap toVariantMap();
-
 };
 
 #endif // PIECE_H

@@ -3,8 +3,6 @@
 #include <QQmlApplicationEngine>
 
 #include "Board.h"
-#include "Enums.h"
-#include "Piece.h"
 
 int main(int argc, char *argv[])
 {
@@ -15,11 +13,7 @@ int main(int argc, char *argv[])
     QGuiApplication app(argc, argv);
     QQmlApplicationEngine engine;
 
-    qmlRegisterType<Piece>("com.checkerboard", 1, 0,"Piece");
-    qmlRegisterSingletonType(QUrl("qrc:/Qml/Theme.qml"),
-                             "com.checkerboard.Theme", 1, 0, "Theme");
-    qmlRegisterUncreatableType<Enums>("com.checkerboard.Enums", 1, 0, "Enums",
-                                      "Enums are read only");
+
 
     Board board;
     engine.rootContext()->setContextProperty("board", &board);

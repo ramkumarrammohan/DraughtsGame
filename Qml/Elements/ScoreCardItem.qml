@@ -10,7 +10,6 @@ Rectangle {
 
     Row {
         anchors.fill: parent
-        // anchors.margins: 2 * Theme.scaleW
 
         CTextBold {
             text: board ? board.playerAScore : 0

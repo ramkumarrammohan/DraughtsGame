@@ -20,13 +20,13 @@ ApplicationWindow {
         spacing: 10 * Theme.scaleH
         anchors.margins: 10 * Theme.scaleW
 
-        // Active Player Componenet
+        // header item | warning content space
         HeaderItem {
             width: parent.width
             height: 50 * Theme.scaleH
         }
 
-        // Main Board Component
+        // main board component
         MainBoard {
             width: parent.width
             height: width

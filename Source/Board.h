@@ -5,10 +5,14 @@
 #include <QVector>
 #include <QVariantMap>
 
-#include "PropertyHelper.h"
 #include "Enums.h"
+#include "PropertyHelper.h"
 
 class Piece;
+/**
+ * @brief The Board class - depicts the 2D board and
+ * contains the game logics & move validations
+ */
 class Board : public QObject
 {
     Q_OBJECT
@@ -33,10 +37,6 @@ public:
     Q_INVOKABLE QVariantMap item(const int &row, const int &column);
     Q_INVOKABLE void setActiveItem(const int &row, const int &column);
 
-    // utility function - can be removed later
-    Q_INVOKABLE void print(const int &row, const int &column);
-    Q_INVOKABLE void makeKing(const int &row, const int &column);
-
 signals:
     void dataChanged();
     void invalidMove();
@@ -57,8 +57,10 @@ private:
     bool isDraw();
     void deleteAll();
     void incrementScore();
+    void registerQmlTypes();
 
 private:
+    // 2D board representation
     QVector<QVector<Piece*> > m_board;
 
 };
