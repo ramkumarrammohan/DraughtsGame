@@ -3,7 +3,7 @@ Simple Draughts Game - 10x10 board with international draughts rules.
 
  The gameboard comprises 10×10 squares in alternating dark and light colours, of which only the 50 dark squares are used. Each player has 20 pieces, light for one player and dark for the other, at opposite sides of the board.
 
-## UI
+## UI - Qml folder
 - Main.qml - Serves as an entry point & holds the main application window 
 - MainBoard.qml - The 2D checkerboard layout & provides an interface for coin movements
 - Theme.qml - Single point of entity which holds all the colour codings & scaling factor values
@@ -15,7 +15,7 @@ Simple Draughts Game - 10x10 board with international draughts rules.
 - PlayerHighlighter.qml - Active player highlighter
 - HeaderItem.qml - Topbar item which is used to show active player and warning messages
 
-## Backend
+## Backend - Source folder
 - Main.cpp/h - Qt app eventloop entry
 - Board.cpp/h - Tracks the coin movement and does move validations
   - Used a QVector-based container to track the board state and player movements
