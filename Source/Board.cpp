@@ -36,7 +36,8 @@ void Board::move()
              << " ==> absDiff:" << absDiff;
 
     Piece* sourceP = m_board[source().x()][source().y()];
-    if(!sourceP)
+    Piece* destnP = m_board[destination().x()][destination().y()];
+    if(!sourceP || !destnP)
         return;
 
     bool captureRequired = hasAnyCaptures(activePlayer());
@@ -49,6 +50,13 @@ void Board::move()
             return;
         }
     }
+
+    // set active to false
+    sourceP->setactive(false);
+
+    // destination empty check
+    if(destnP->player() != Enums::PlayerNone || destnP->type() != Enums::TypeNone)
+        return;
 
     clearHighlights();
     bool moveOk = false;
@@ -212,22 +220,9 @@ void Board::changePlayers()
 
 bool Board::kingMoveValidation()
 {
-    QPoint src = source();
-    QPoint dst = destination();
-    QPoint diff = dst - src;
-
-    Piece* sourceP = m_board[src.x()][src.y()];
-    Piece* destnP = m_board[dst.x()][dst.y()];
-
-    if(!sourceP || !destnP || sourceP->type() != Enums::PieceType::King)
-        return false;
-
-    // set active to false
-    sourceP->setactive(false);
-
-    // destination empty check
-    if(destnP->player() != Enums::PlayerNone || destnP->type() != Enums::TypeNone)
-        return false;
+    QPoint diff = destination() - source();
+    Piece* sourceP = m_board[source().x()][source().y()];
+    Piece* destnP = m_board[destination().x()][destination().y()];
 
     if(qAbs(diff.x()) != qAbs(diff.y()))
         return false;  // must be diagonal
@@ -235,12 +230,12 @@ bool Board::kingMoveValidation()
     int dx = (diff.x() > 0) ? 1 : -1;
     int dy = (diff.y() > 0) ? 1 : -1;
     QPoint dpos(dx, dy);
-    QPoint xy = src + dpos;
+    QPoint xy = source() + dpos;
 
     bool captured = false;
     QPoint cap(-1,-1);
 
-    while(xy != dst)
+    while(xy != destination())
     {
         if(isInBounds(xy))
         {
@@ -273,13 +268,14 @@ bool Board::kingMoveValidation()
     }
 
     // swap
-    m_board[dst.x()][dst.y()] = sourceP;
-    m_board[src.x()][src.y()] = destnP;
+    m_board[destination().x()][destination().y()] = sourceP;
+    m_board[source().x()][source().y()] = destnP;
 
-    if(captured && hasFurtherCaptures(dst))
+    if(captured && hasFurtherCaptures(destination()))
     {
-        setsource(dst);
+        setsource(destination());
         setisMoving(true);
+        sourceP->setactive(true);
     }
     else
     {
@@ -292,27 +288,13 @@ bool Board::kingMoveValidation()
 
 bool Board::singleMoveValidation()
 {
-    QPoint src = source();
-    QPoint dst = destination();
-    QPoint diff = dst - src;
-
-    Piece* sourceP = m_board[src.x()][src.y()];
-    Piece* destnP = m_board[dst.x()][dst.y()];
-
-    if(!sourceP || !destnP)
-        return false;
-
-    // set active to false
-    sourceP->setactive(false);
-
-    // destination empty check
-    if(destnP->player() != Enums::PlayerNone || destnP->type() != Enums::TypeNone)
-        return false;
-
+    QPoint diff = destination() - source();
     // allow only 1 step diagonal
-    if(std::abs(diff.x()) != 1 || std::abs(diff.y()) != 1)
+    if(qAbs(diff.x()) != 1 || qAbs(diff.y()) != 1)
         return false;
 
+    Piece* sourceP = m_board[source().x()][source().y()];
+    Piece* destnP = m_board[destination().x()][destination().y()];
     // man piece movement conditions
     if(sourceP->type() == Enums::PieceType::Man)
     {
@@ -323,39 +305,29 @@ bool Board::singleMoveValidation()
     }
 
     // swap the pieces
-    m_board[dst.x()][dst.y()] = sourceP;
-    m_board[src.x()][src.y()] = destnP;
+    m_board[destination().x()][destination().y()] = sourceP;
+    m_board[source().x()][source().y()] = destnP;
 
     // extra validations
     setisMoving(false);
-    checkAndPromoteKing(dst);
+    checkAndPromoteKing(destination());
 
     return true;
 }
 
 bool Board::multipleMoveValidation()
 {
-    QPoint src = source();
-    QPoint dst = destination();
-    QPoint diff = dst - src;
-
-    Piece* sourceP = m_board[src.x()][src.y()];
-    Piece* destnP = m_board[dst.x()][dst.y()];
-
-    if(!sourceP || !destnP)
-        return false;
-
-    // destination empty check
-    if(destnP->player() != Enums::PlayerNone || destnP->type() != Enums::TypeNone)
-        return false;
-
+    QPoint diff = destination() - source();
     // allow only 2 step diagonal
-    if(std::abs(diff.x()) != 2 || std::abs(diff.y()) != 2)
+    if(qAbs(diff.x()) != 2 || qAbs(diff.y()) != 2)
         return false;
+
+    Piece* sourceP = m_board[source().x()][source().y()];
+    Piece* destnP = m_board[destination().x()][destination().y()];
 
     // midpoint must contain opponent's piece
-    int midX = src.x() + diff.x() / 2;
-    int midY = src.y() + diff.y() / 2;
+    int midX = source().x() + diff.x() / 2;
+    int midY = source().y() + diff.y() / 2;
 
     Piece* middlePiece = m_board[midX][midY];
     if(!middlePiece || middlePiece->player() != opponentPlayer())
@@ -367,16 +339,17 @@ bool Board::multipleMoveValidation()
     incrementScore();
 
     // swap the pieces
-    m_board[dst.x()][dst.y()] = sourceP;
-    m_board[src.x()][src.y()] = destnP;
-    checkAndPromoteKing(dst);
+    m_board[destination().x()][destination().y()] = sourceP;
+    m_board[source().x()][source().y()] = destnP;
+    checkAndPromoteKing(destination());
 
     // check for continuation
-    if(hasFurtherCaptures(dst))
+    if(hasFurtherCaptures(destination()))
     {
-        setsource(dst);
+        setsource(destination());
         setisMoving(true);  // turn continue
-        this->highlightLegalMoves(dst);
+        sourceP->setactive(true);
+        this->highlightLegalMoves(destination());
     }
     else
     {
