@@ -17,6 +17,7 @@ QVariantMap Piece::toVariantMap()
     map["type"] = this->type();
     map["player"] = this->player();
     map["active"] = this->active();
+    map["highlighted"] = this->highlighted();
 
     return map;
 }

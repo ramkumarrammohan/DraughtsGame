@@ -12,6 +12,7 @@ class Piece : public QObject
     Q_OBJECT
 
     AUTO_PROPERTY(bool, active, false)
+    AUTO_PROPERTY(bool, highlighted, false)
     AUTO_PROPERTY(Enums::Player, player, Enums::Player::PlayerNone)
     AUTO_PROPERTY(Enums::PieceType, type, Enums::PieceType::TypeNone)
 

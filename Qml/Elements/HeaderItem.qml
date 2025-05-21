@@ -72,9 +72,9 @@ Rectangle {
 
     Connections {
         target: board
-        function onInvalidMove()
+        function onInvalidMove(msg)
         {
-            messageTextId.text = "Invalid Move"
+            messageTextId.text = msg;
             messageItemId.show()
         }
     }

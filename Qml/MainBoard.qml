@@ -30,7 +30,8 @@ Rectangle {
                         height: rootBoardId.height / 10
                         property int xCord: index
                         property int yCord: yPos
-                        color: (xCord + yCord) % 2 === 0 ? Theme.tileLight : Theme.tileDark;
+                        color: coinId.item.highlighted ? Theme.yellow :
+                                                   (xCord + yCord) % 2 === 0 ? Theme.tileLight : Theme.tileDark;
 
                         Coin {
                             id: coinId
@@ -52,8 +53,6 @@ Rectangle {
                                 else if(board.activePlayer === coinId.item.player)
                                 {
                                     board.setActiveItem(yCord, xCord)
-                                    board.isMoving = true
-                                    board.source = Qt.point(yCord, xCord)
                                 }
                             }
                         }

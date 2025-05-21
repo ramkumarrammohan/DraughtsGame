@@ -39,15 +39,17 @@ public:
 
 signals:
     void dataChanged();
-    void invalidMove();
+    void invalidMove(QString msg);
     void gameOver(Enums::Player winner);
     void gameDraw();
 
 private:
     void initialize();
     void changePlayers();
+    bool kingMoveValidation();
     bool singleMoveValidation();
     bool multipleMoveValidation();
+    bool hasAnyCaptures(Enums::Player player);
     bool hasFurtherCaptures(const QPoint &pos);
     void checkAndPromoteKing(const QPoint &pos);
     Enums::Player checkForWinner();
@@ -58,6 +60,8 @@ private:
     void deleteAll();
     void incrementScore();
     void registerQmlTypes();
+    void highlightLegalMoves(const QPoint &pos);
+    void clearHighlights();
 
 private:
     // 2D board representation

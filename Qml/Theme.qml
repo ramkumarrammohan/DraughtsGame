@@ -17,6 +17,7 @@ QtObject {
     property color black: "#000000"
     property color red: "#7B3A3A"
     property color green: "#4E7B3A"
+    property color yellow: "#FFDB58"
     property color transparent: "transparent"
     property color boardBackground: "#5A3A1A"
     property color boardBackgroundLight: "#7B5B39"
