@@ -30,78 +30,61 @@ void Board::move()
     }
 
     Enums::Player winner = Enums::PlayerNone;
-    QPoint diff = source() - destination();
-    QPoint absDiff = QPoint(qAbs(diff.x()), qAbs(diff.y()));
-    qDebug() << "\nmoving from:" << source() << "to:" << destination()
-             << " ==> absDiff:" << absDiff;
-
     Piece* sourceP = m_board[source().x()][source().y()];
-    Piece* destnP = m_board[destination().x()][destination().y()];
-    if(!sourceP || !destnP)
+    if(!sourceP)
         return;
 
+    // Check if capture is mandatory but player is not capturing
     bool captureRequired = hasAnyCaptures(activePlayer());
-    if(captureRequired && sourceP->type() == Enums::Man)
+    if(captureRequired && !hasFurtherCaptures(source()))
     {
-        if(absDiff.x() != 2 || absDiff.y() != 2)
-        {
-            qDebug() << "Capture is mandatory!";
-            emit invalidMove("Mandatory Capture Available");
-            return;
-        }
+        qDebug() << "Capture is mandatory!";
+        emit invalidMove("Mandatory Capture Available");
+        return;
     }
 
-    // set active to false
     sourceP->setactive(false);
-
-    // destination empty check
-    if(destnP->player() != Enums::PlayerNone || destnP->type() != Enums::TypeNone)
-        return;
-
     clearHighlights();
-    bool moveOk = false;
-    if(sourceP->type() == Enums::PieceType::Man && absDiff.x() == 1 && absDiff.y() == 1)
-        moveOk = singleMoveValidation();
-    else if(sourceP->type() == Enums::PieceType::Man && absDiff.x() == 2 && absDiff.y() == 2)
-        moveOk = multipleMoveValidation();
-    else if(sourceP->type() == Enums::PieceType::King)
-        moveOk = kingMoveValidation();
 
-    if(moveOk && !isMoving())
-    {
+    MoveResult result = validateAndExecuteMove(source(), destination());
+
+    if(!result.isValid) {
+        setisMoving(false);
+        setsource(QPoint(-1, -1));
+        setdestination(QPoint(-1, -1));
+        emit invalidMove(result.errorMessage);
+        emit dataChanged();
+        return;
+    }
+
+    // Handle successful move
+    if(result.hasMoreCaptures) {
+        // Continue capturing sequence
+        setsource(destination());
+        setisMoving(true);
+        sourceP->setactive(true);
+        highlightLegalMoves(destination());
+    } else {
+        // End turn
         winner = checkForWinner();
-        this->changePlayers();
+        sourceP->setactive(false);
+        setisMoving(false);
+        changePlayers();
         setsource(QPoint(-1, -1));
         setdestination(QPoint(-1, -1));
         setmoveCount(moveCount() + 1);
     }
-    else if(!moveOk)
-    {
-        setisMoving(false);
-        Piece *p = m_board[source().x()][source().y()];
-        p->setactive(false);
-
-        setsource(QPoint(-1, -1));
-        setdestination(QPoint(-1, -1));
-
-        emit invalidMove("Invalid Move");
-    }
 
     emit dataChanged();
-    qDebug() << "current state. activeplayer:" << this->activePlayer()
-             << "isMoving:" << this->isMoving()
-             << "source:" << this->source()
-             << "destination:" << this->destination();
 
-    if(winner != Enums::PlayerNone)
-    {
+    // Check for game end conditions
+    if(winner != Enums::PlayerNone) {
         qDebug() << "Gameover. winner:" << winner;
         emit gameOver(winner);
         return;
     }
 
-    if(isDraw())
-    {
+    if(isDraw()) {
         qDebug() << "Game draw.. No movements further";
         emit gameDraw();
         return;
@@ -216,148 +199,6 @@ void Board::changePlayers()
         setactivePlayer(Enums::Player::PlayerA);
         setopponentPlayer(Enums::Player::PlayerB);
     }
-}
-
-bool Board::kingMoveValidation()
-{
-    QPoint diff = destination() - source();
-    Piece* sourceP = m_board[source().x()][source().y()];
-    Piece* destnP = m_board[destination().x()][destination().y()];
-
-    if(qAbs(diff.x()) != qAbs(diff.y()))
-        return false;  // must be diagonal
-
-    int dx = (diff.x() > 0) ? 1 : -1;
-    int dy = (diff.y() > 0) ? 1 : -1;
-    QPoint dpos(dx, dy);
-    QPoint xy = source() + dpos;
-
-    bool captured = false;
-    QPoint cap(-1,-1);
-
-    while(xy != destination())
-    {
-        if(isInBounds(xy))
-        {
-            Piece* mid = m_board[xy.x()][xy.y()];
-
-            if(mid && mid->player() == sourceP->player())
-                return false;  // cannot jump over own piece
-
-            if(mid && mid->player() == opponentPlayer())
-            {
-                if(captured)
-                    return false;  // only one capture allowed in one step
-                captured = true;
-                cap = xy;
-            }
-
-            if(mid && mid->player() != Enums::PlayerNone && !(captured && xy == cap))
-                return false;  // blocked
-        }
-
-        xy.setX(xy.x() + dpos.x());
-        xy.setY(xy.y() + dpos.y());
-    }
-
-    if(captured)
-    {
-        delete m_board[cap.x()][cap.y()];
-        m_board[cap.x()][cap.y()] = new Piece();
-        incrementScore();
-    }
-
-    // swap
-    m_board[destination().x()][destination().y()] = sourceP;
-    m_board[source().x()][source().y()] = destnP;
-
-    if(captured && hasFurtherCaptures(destination()))
-    {
-        setsource(destination());
-        setisMoving(true);
-        sourceP->setactive(true);
-    }
-    else
-    {
-        sourceP->setactive(false);
-        setisMoving(false);
-    }
-
-    return true;
-}
-
-bool Board::singleMoveValidation()
-{
-    QPoint diff = destination() - source();
-    // allow only 1 step diagonal
-    if(qAbs(diff.x()) != 1 || qAbs(diff.y()) != 1)
-        return false;
-
-    Piece* sourceP = m_board[source().x()][source().y()];
-    Piece* destnP = m_board[destination().x()][destination().y()];
-    // man piece movement conditions
-    if(sourceP->type() == Enums::PieceType::Man)
-    {
-        if(sourceP->player() == Enums::Player::PlayerA && diff.x() != 1)
-            return false;  // PlayerA moves downward
-        if(sourceP->player() == Enums::Player::PlayerB && diff.x() != -1)
-            return false;  // PlayerB moves upward
-    }
-
-    // swap the pieces
-    m_board[destination().x()][destination().y()] = sourceP;
-    m_board[source().x()][source().y()] = destnP;
-
-    // extra validations
-    setisMoving(false);
-    checkAndPromoteKing(destination());
-
-    return true;
-}
-
-bool Board::multipleMoveValidation()
-{
-    QPoint diff = destination() - source();
-    // allow only 2 step diagonal
-    if(qAbs(diff.x()) != 2 || qAbs(diff.y()) != 2)
-        return false;
-
-    Piece* sourceP = m_board[source().x()][source().y()];
-    Piece* destnP = m_board[destination().x()][destination().y()];
-
-    // midpoint must contain opponent's piece
-    int midX = source().x() + diff.x() / 2;
-    int midY = source().y() + diff.y() / 2;
-
-    Piece* middlePiece = m_board[midX][midY];
-    if(!middlePiece || middlePiece->player() != opponentPlayer())
-        return false;
-
-    // perform the capture
-    delete m_board[midX][midY];
-    m_board[midX][midY] = new Piece();
-    incrementScore();
-
-    // swap the pieces
-    m_board[destination().x()][destination().y()] = sourceP;
-    m_board[source().x()][source().y()] = destnP;
-    checkAndPromoteKing(destination());
-
-    // check for continuation
-    if(hasFurtherCaptures(destination()))
-    {
-        setsource(destination());
-        setisMoving(true);  // turn continue
-        sourceP->setactive(true);
-        this->highlightLegalMoves(destination());
-    }
-    else
-    {
-        sourceP->setactive(false);
-        setisMoving(false);  // turn ends
-    }
-
-    return true;
 }
 
 bool Board::hasAnyCaptures(Enums::Player player)
@@ -498,47 +339,9 @@ bool Board::canPieceMove(const QPoint &pos)
     if(!p || p->player() == Enums::PlayerNone)
         return false;
 
-    QVector<QPoint> directions;
-    if(p->type() == Enums::PieceType::King)
-    {
-        // all diagonal directions
-        directions = { {-1,-1}, {-1,1}, {1,-1}, {1,1} };
-    }
-    else if(p->player() == Enums::PlayerA)
-    {
-        // downward only
-        directions = { {1,-1}, {1,1} };
-    }
-    else if(p->player() == Enums::PlayerB)
-    {
-        // upward only
-        directions = { {-1,-1}, {-1,1} };
-    }
-
-    foreach(const QPoint &d, directions)
-    {
-        QPoint move = pos + d;
-        if(isInBounds(move))
-        {
-            Piece* dest = m_board[move.x()][move.y()];
-            if(dest && dest->player() == Enums::PlayerNone)
-                return true;  // simple move available
-        }
-
-        // Check capture
-        QPoint capture = pos + d * 2;
-        QPoint mid = pos + d;
-        if(isInBounds(capture) && isInBounds(mid))
-        {
-            Piece* middle = m_board[mid.x()][mid.y()];
-            Piece* dest = m_board[capture.x()][capture.y()];
-            if(middle && middle->player() == opponentPlayer() &&
-                dest && dest->player() == Enums::PlayerNone)
-                return true;  // capture available
-        }
-    }
-
-    return false;
+    // Use the unified legal moves system
+    QVector<MoveCandidate> moves = getLegalMoves(pos);
+    return !moves.isEmpty();
 }
 
 bool Board::canPlayerMove(Enums::Player player)
@@ -608,119 +411,199 @@ void Board::clearHighlights()
     }
 }
 
+QVector<MoveCandidate> Board::getLegalMoves(const QPoint &pos)
+{
+    QVector<MoveCandidate> moves;
+    Piece* piece = m_board[pos.x()][pos.y()];
+
+    if(!piece || piece->player() == Enums::PlayerNone)
+        return moves;
+
+    bool mustCapture = hasAnyCaptures(piece->player());
+
+    if(piece->type() == Enums::PieceType::King)
+        moves = getKingMoves(pos, mustCapture);
+    else
+        moves = getManMoves(pos, mustCapture);
+
+    return moves;
+}
+
+QVector<MoveCandidate> Board::getManMoves(const QPoint &pos, bool mustCapture)
+{
+    QVector<MoveCandidate> moves;
+    Piece* piece = m_board[pos.x()][pos.y()];
+
+    QVector<QPoint> directions;
+    if(piece->player() == Enums::PlayerA)
+    {
+        directions = { {1, -1}, {1, 1} }; // downward
+    }
+    else
+    {
+        directions = { {-1, -1}, {-1, 1} }; // upward
+    }
+
+    // During multi-capture sequence, allow all directions
+    if(mustCapture && source() == pos)
+    {
+        directions = { {-1, -1}, {-1, 1}, {1, -1}, {1, 1} };
+    }
+
+    foreach(const QPoint& dir, directions)
+    {
+        // Check for captures (2-step moves)
+        QPoint jumpPos = pos + dir * 2;
+        QPoint midPos = pos + dir;
+
+        if(isInBounds(jumpPos) && isInBounds(midPos))
+        {
+            Piece* midPiece = m_board[midPos.x()][midPos.y()];
+            Piece* jumpPiece = m_board[jumpPos.x()][jumpPos.y()];
+
+            if(midPiece && midPiece->player() == opponentPlayer() &&
+                jumpPiece && jumpPiece->player() == Enums::PlayerNone)
+            {
+                moves.append(MoveCandidate(pos, jumpPos, true, midPos));
+            }
+        }
+
+        // Check for simple moves (1-step) only if no captures are mandatory
+        if(!mustCapture)
+        {
+            QPoint movePos = pos + dir;
+            if(isInBounds(movePos))
+            {
+                Piece* movePiece = m_board[movePos.x()][movePos.y()];
+                if(movePiece && movePiece->player() == Enums::PlayerNone)
+                {
+                    moves.append(MoveCandidate(pos, movePos, false));
+                }
+            }
+        }
+    }
+
+    return moves;
+}
+
+QVector<MoveCandidate> Board::getKingMoves(const QPoint &pos, bool mustCapture)
+{
+    QVector<MoveCandidate> moves;
+    QVector<QPoint> directions = { {-1, -1}, {-1, 1}, {1, -1}, {1, 1} };
+
+    for (const QPoint& dir : directions)
+    {
+        int step = 1;
+        QPoint enemyPos(-1, -1);
+        bool foundEnemy = false;
+
+        while (true)
+        {
+            QPoint current = pos + dir * step;
+            if(!isInBounds(current))
+                break;
+
+            Piece* currentPiece = m_board[current.x()][current.y()];
+
+            if(!currentPiece || currentPiece->player() == Enums::PlayerNone)
+            {
+                // Empty square
+                if(!mustCapture && !foundEnemy)
+                {
+                    // Normal move
+                    moves.append(MoveCandidate(pos, current, false));
+                }
+                else if(foundEnemy)
+                {
+                    // Landing square after capture
+                    moves.append(MoveCandidate(pos, current, true, enemyPos));
+                }
+            } else if(currentPiece->player() == opponentPlayer())
+            {
+                if(foundEnemy)
+                    break; // Can't jump over multiple enemies
+
+                foundEnemy = true;
+                enemyPos = current;
+            }
+            else
+            {
+                break; // Own piece - blocked
+            }
+
+            step++;
+        }
+    }
+
+    return moves;
+}
+
+MoveResult Board::validateAndExecuteMove(const QPoint &from, const QPoint &to)
+{
+    MoveResult result;
+
+    QVector<MoveCandidate> legalMoves = getLegalMoves(from);
+    MoveCandidate* validMove = nullptr;
+
+    // Find if the requested move is in our legal moves
+    for (auto& move : legalMoves)
+    {
+        if(move.to == to)
+        {
+            validMove = &move;
+            break;
+        }
+    }
+
+    if(!validMove)
+    {
+        result.errorMessage = "Invalid Move";
+        return result;
+    }
+
+    // Execute the move
+    result.isValid = true;
+    result.isCapture = validMove->isCapture;
+    result.capturedPiecePos = validMove->capturedPos;
+
+    Piece* sourcePiece = m_board[from.x()][from.y()];
+    Piece* destPiece = m_board[to.x()][to.y()];
+
+    // Handle capture
+    if(validMove->isCapture)
+    {
+        delete m_board[validMove->capturedPos.x()][validMove->capturedPos.y()];
+        m_board[validMove->capturedPos.x()][validMove->capturedPos.y()] = new Piece();
+        incrementScore();
+    }
+
+    // Move the piece
+    m_board[to.x()][to.y()] = sourcePiece;
+    m_board[from.x()][from.y()] = destPiece;
+
+    // Check for king promotion
+    checkAndPromoteKing(to);
+
+    // Check for further captures
+    if(validMove->isCapture)
+    {
+        result.hasMoreCaptures = hasFurtherCaptures(to);
+    }
+
+    return result;
+}
+
 void Board::highlightLegalMoves(const QPoint &pos)
 {
     Piece* p = m_board[pos.x()][pos.y()];
     if(!p || p->player() != activePlayer())
         return;
 
-    // Step 1: Check if any capture exists on board
-    bool anyCaptureExists = false;
-    for(int row = 0; row < BOARD_SIZE && !anyCaptureExists; ++row)
+    QVector<MoveCandidate> legalMoves = getLegalMoves(pos);
+
+    foreach(const auto& move, legalMoves)
     {
-        for(int col = 0; col < BOARD_SIZE && !anyCaptureExists; ++col)
-        {
-            Piece* checkP = m_board[row][col];
-            if(checkP && checkP->player() == activePlayer())
-            {
-                QPoint piecePos(row, col);
-                if(hasFurtherCaptures(piecePos))
-                {
-                    anyCaptureExists = true;
-                }
-            }
-        }
-    }
-
-    QVector<QPoint> directions;
-    if(p->type() == Enums::PieceType::King || anyCaptureExists)
-    {
-        directions = { {-1,-1}, {-1,1}, {1,-1}, {1,1} };
-    }
-    else if(p->player() == Enums::PlayerA)
-    {
-        directions = { {1,-1}, {1,1} };
-    }
-    else if(p->player() == Enums::PlayerB)
-    {
-        directions = { {-1,-1}, {-1,1} };
-    }
-
-    // Step 2: Highlight legal moves for current piece
-    foreach(const QPoint& d, directions)
-    {
-        if(p->type() == Enums::PieceType::King)
-        {
-            // Long-range king movement and capturing
-            int step = 1;
-            bool enemyFound = false;
-            QPoint enemyPos;
-
-            while(true)
-            {
-                QPoint current = pos + d * step;
-                if(!isInBounds(current))
-                    break;
-
-                Piece* target = m_board[current.x()][current.y()];
-
-                if(!target || target->player() == Enums::PlayerNone)
-                {
-                    if(!anyCaptureExists && !enemyFound)
-                    {
-                        // Normal king move
-                        m_board[current.x()][current.y()]->sethighlighted(true);
-                    }
-                    else if(enemyFound)
-                    {
-                        // Capture landing square
-                        m_board[current.x()][current.y()]->sethighlighted(true);
-                    }
-                }
-                else if(target->player() == opponentPlayer())
-                {
-                    if(enemyFound)
-                        break; // Only one enemy allowed between start and landing
-                    enemyFound = true;
-                    enemyPos = current;
-                }
-                else // blocked
-                {
-                    break;
-                }
-
-                ++step;
-            }
-        }
-        else
-        {
-            // Man movement and capturing (1-step diagonals)
-            QPoint move = pos + d;
-            QPoint jump = pos + d * 2;
-            QPoint between = pos + d;
-
-            // Capture
-            if(isInBounds(jump) && isInBounds(between))
-            {
-                Piece* midPiece = m_board[between.x()][between.y()];
-                Piece* destPiece = m_board[jump.x()][jump.y()];
-
-                if(midPiece && midPiece->player() == opponentPlayer() &&
-                    destPiece && destPiece->player() == Enums::PlayerNone)
-                {
-                    destPiece->sethighlighted(true);
-                }
-            }
-
-            // Normal move
-            if(!anyCaptureExists && isInBounds(move))
-            {
-                Piece* destPiece = m_board[move.x()][move.y()];
-                if(destPiece && destPiece->player() == Enums::PlayerNone)
-                {
-                    destPiece->sethighlighted(true);
-                }
-            }
-        }
+        m_board[move.to.x()][move.to.y()]->sethighlighted(true);
     }
 }
+

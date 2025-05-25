@@ -8,6 +8,27 @@
 #include "Enums.h"
 #include "PropertyHelper.h"
 
+struct MoveResult {
+    bool isValid;
+    bool isCapture;
+    QPoint capturedPiecePos;
+    bool hasMoreCaptures;
+    QString errorMessage;
+
+    MoveResult() : isValid(false), isCapture(false), capturedPiecePos(-1,-1), hasMoreCaptures(false) {}
+};
+
+struct MoveCandidate {
+    QPoint from;
+    QPoint to;
+    bool isCapture;
+    QPoint capturedPos;
+
+    MoveCandidate(QPoint f, QPoint t, bool cap = false, QPoint capPos = QPoint(-1,-1))
+        : from(f), to(t), isCapture(cap), capturedPos(capPos) {}
+};
+
+
 class Piece;
 /**
  * @brief The Board class - depicts the 2D board and
@@ -46,9 +67,6 @@ signals:
 private:
     void initialize();
     void changePlayers();
-    bool kingMoveValidation();
-    bool singleMoveValidation();
-    bool multipleMoveValidation();
     bool hasAnyCaptures(Enums::Player player);
     bool hasFurtherCaptures(const QPoint &pos);
     void checkAndPromoteKing(const QPoint &pos);
@@ -62,6 +80,12 @@ private:
     void registerQmlTypes();
     void highlightLegalMoves(const QPoint &pos);
     void clearHighlights();
+
+    // Unified method to get all legal moves for a piece
+    QVector<MoveCandidate> getLegalMoves(const QPoint &pos);
+    QVector<MoveCandidate> getManMoves(const QPoint &pos, bool mustCapture);
+    QVector<MoveCandidate> getKingMoves(const QPoint &pos, bool mustCapture);
+    MoveResult validateAndExecuteMove(const QPoint &from, const QPoint &to);
 
 private:
     // 2D board representation
